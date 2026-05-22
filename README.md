@@ -4,3 +4,4 @@
 ### Documentações utilizadas: 
 
 **pdfplumber:** https://pypi.org/project/pdfplumber/
+**re (expressões regulares):** https://docs.python.org/3/library/re.html
