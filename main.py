@@ -1,168 +1,135 @@
-import pdfplumber
+import sqlite3
 import json
-import re
+import os
 
-def identificar_e_mapear_linha(row_cells, grupo_anterior):
-    cells = [str(c).strip().replace('\n', ' ') if c is not None else "" for c in row_cells]
-    
-    if all(c == "" for c in cells):
-        return None, grupo_anterior
-        
-    linha_completa = " ".join(cells).lower()
-    
-    # 🛑 FILTRO DE LIXO: Mata a legenda colorida e os títulos de coluna repetidos
-    palavras_lixo = [
-        "probabilidade de ocorrência", "frequência de exposição", 
-        "grau da possível lesão", "pessoas sob risco", 
-        "classificação de risco", "possibilidade de evitar", 
-        "apreciação dos riscos", "tipo ou grupo", 
-        "perigos relacionados", "análise atual", 
-        "0,033", ">500", "legenda", "0 a 1", "1 a 50"
-    ]
-    if any(p in linha_completa for p in palavras_lixo):
-        return None, grupo_anterior
-        
-    def eh_numero(s):
-        return bool(re.match(r'^\d+([.,]\d+)?$', s))
-        
-    indices_num = [i for i, c in enumerate(cells) if eh_numero(c)]
-    
-    if len(indices_num) < 3:
-        return None, grupo_anterior
+# constantes 
+ARQUIVO_JSON = "extracao_finalizada1.json"
+NOME_BANCO = "database.db"
 
-    start_num_idx = -1
-    for i in range(len(indices_num) - 2):
-        if indices_num[i+2] - indices_num[i] <= 4:
-            start_num_idx = indices_num[i]
-            break
-            
-    if start_num_idx == -1:
-        return None, grupo_anterior
-
-    bloco_numerico = [i for i in indices_num if i >= start_num_idx]
-
-    # --- 1. MAPEAMENTO (ESQUERDA) - Agora com Medida Proposta Dinâmica! ---
-    textos_antes = [cells[i] for i in range(start_num_idx) if cells[i] != ""]
-    tipo, perigo, risco, medida_proposta = "", "", "", ""
+def criar_banco_e_tabela():
+    """Conecta ao banco SQLite e cria as tabelas necessárias."""
+    conn = sqlite3.connect(NOME_BANCO)
+    cursor = conn.cursor()
     
-    # Se vieram 4 colunas antes dos números (Tem a medida proposta!)
-    if len(textos_antes) >= 4:
-        tipo = textos_antes[0]
-        perigo = textos_antes[1]
-        risco = textos_antes[2]
-        medida_proposta = " ".join(textos_antes[3:])
-    # Padrão normal (Só 3 colunas)
-    elif len(textos_antes) == 3:
-        tipo = textos_antes[0]
-        perigo = textos_antes[1]
-        risco = textos_antes[2]
-    # Células mescladas
-    elif len(textos_antes) == 2:
-        if cells[0] == "":
-            tipo = ""
-            perigo = textos_antes[0]
-            risco = textos_antes[1]
+    # Criando a tabela para situação proposta
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS hrn_sit_proposta(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tipo_grupo TEXT,
+        perigo TEXT,
+        risco_consequencia TEXT,
+        medida_Controle_Proposta TEXT,
+        p TEXT,
+        f TEXT,
+        gpl TEXT,
+        np TEXT,
+        avaliacao_valor TEXT,
+        avaliacao_status TEXT,
+        medida_controle TEXT,
+        foto TEXT
+    )
+    """)
+    
+    # Criando a tabela para situação atual - retira o campo de proposta
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS hrn_sit_atual (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tipo_grupo TEXT,
+        perigo TEXT,
+        risco_consequencia TEXT,
+        p TEXT,
+        f TEXT,
+        gpl TEXT,
+        np TEXT,
+        avaliacao_valor TEXT,
+        avaliacao_status TEXT,
+        medida_controle TEXT,
+        foto TEXT
+    )
+    """)
+    
+    conn.commit()
+    conn.close()
+
+def importar_json_para_banco():
+    """Lê o arquivo JSON e insere os dados separadamente."""
+    if not os.path.exists(ARQUIVO_JSON):
+        print(f"Erro: O arquivo {ARQUIVO_JSON} não foi encontrado.")
+        return
+
+    with open(ARQUIVO_JSON, 'r', encoding='utf-8') as f:
+        relatorios = json.load(f)
+
+    conn = sqlite3.connect(NOME_BANCO)
+    cursor = conn.cursor()
+    
+    # contadores das linhas que foram inseridas
+    contador_proposta = 0
+    contador_atual = 0
+    
+    for linha in relatorios:
+        if not isinstance(linha, dict):
+            continue
+
+        # Tratando variação de maiúscula/minúscula na chave do JSON
+        chave_proposta = None
+        for k in linha.keys():
+            if k.lower() == 'medida_controle_proposta':
+                chave_proposta = k
+                break
+
+        # caso a chave exista e nao esta em branco 
+        if chave_proposta and linha.get(chave_proposta):
+            #faz o insert na tabela de hrn - situacao proposta
+            cursor.execute("""
+                INSERT INTO hrn_sit_proposta (
+                    tipo_grupo, perigo, risco_consequencia, medida_Controle_Proposta, p, f, gpl, np, 
+                    avaliacao_valor, avaliacao_status, medida_controle, foto
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                linha.get("Tipo_Grupo") or linha.get("tipo_grupo", ""),
+                linha.get("Perigo") or linha.get("perigo", ""),
+                linha.get("Risco_Consequencia") or linha.get("risco_consequencia", ""),
+                linha.get(chave_proposta, ""),
+                linha.get("P") or linha.get("p", ""),
+                linha.get("F") or linha.get("f", ""),
+                linha.get("GPL") or linha.get("gpl", ""),
+                linha.get("NP") or linha.get("np", ""),
+                linha.get("Avaliacao_Valor") or linha.get("avaliacao_valor", ""),
+                linha.get("Avaliacao_Status") or linha.get("avaliacao_status", ""),
+                linha.get("Medida_Controle") or linha.get("medida_controle", ""),
+                linha.get("Foto") or linha.get("foto", "")
+            ))
+            contador_proposta += 1
         else:
-            tipo = textos_antes[0]
-            perigo = textos_antes[1]
-    elif len(textos_antes) == 1:
-        perigo = textos_antes[0]
-
-    if tipo == "":
-        tipo = grupo_anterior
-    else:
-        grupo_anterior = tipo
-
-    # --- 2. MAPEAMENTO (NÚMEROS) ---
-    idx_p = bloco_numerico[0] if len(bloco_numerico) > 0 else -1
-    idx_f = bloco_numerico[1] if len(bloco_numerico) > 1 else -1
-    idx_gpl = bloco_numerico[2] if len(bloco_numerico) > 2 else -1 
-    idx_np = bloco_numerico[3] if len(bloco_numerico) > 3 else -1
-    idx_av = bloco_numerico[4] if len(bloco_numerico) > 4 else -1
-    
-    val_p = cells[idx_p] if idx_p != -1 else ""
-    val_f = cells[idx_f] if idx_f != -1 else ""
-    val_gpl = cells[idx_gpl] if idx_gpl != -1 else ""
-    val_np = cells[idx_np] if idx_np != -1 else ""
-    val_avaliacao = cells[idx_av] if idx_av != -1 else ""
-
-    # --- 3. MAPEAMENTO (DIREITA) ---
-    ultimo_idx_num = idx_av if idx_av != -1 else (idx_np if idx_np != -1 else idx_gpl)
-    textos_depois = [cells[i] for i in range(ultimo_idx_num + 1, len(cells)) if cells[i] != ""]
-    
-    status_av, medida, foto = "", "", ""
-    if len(textos_depois) >= 3:
-        status_av = textos_depois[0]
-        medida = textos_depois[1]
-        foto = " ".join(textos_depois[2:])
-    elif len(textos_depois) == 2:
-        if len(textos_depois[0]) < 15:
-            status_av = textos_depois[0]
-            medida = textos_depois[1]
-        else:
-            medida = textos_depois[0]
-            foto = textos_depois[1]
-    elif len(textos_depois) == 1:
-        if len(textos_depois[0]) < 15:
-            status_av = textos_depois[0]
-        else:
-            medida = textos_depois[0]
-
-    # Dicionário Bruto
-    linha_bruta = {
-        "Tipo_Grupo": tipo,
-        "Perigo": perigo,
-        "Risco_Consequencia": risco,
-        "Medida_Controle_Proposta": medida_proposta, # Se existir, entra. Se não, some!
-        "P": val_p,
-        "F": val_f,
-        "GPL": val_gpl,
-        "NP": val_np,
-        "Avaliacao_Valor": val_avaliacao,
-        "Avaliacao_Status": status_av,
-        "Medida_Controle_Existente": medida, # Renomeei para diferenciar da proposta
-        "Foto": foto
-    }
-    
-    # Limpeza condicional
-    linha_json = {chave: valor for chave, valor in linha_bruta.items() if str(valor).strip() != ""}
-    return linha_json, grupo_anterior
-
-
-def extrair_somente_riscos_plano(caminho_pdf):
-    print("🚀 Extraindo matriz de riscos final...")
-    
-    lista_plana_final = [] 
-    grupo_risco_atual = None
-
-    with pdfplumber.open(caminho_pdf) as pdf:
-        for num_pagina, pagina in enumerate(pdf.pages):
-            
-            tabelas = pagina.extract_tables()
-            if not tabelas:
-                continue
-                
-            for tabela in tabelas:
-                if not tabela or len(tabela) == 0:
-                    continue
-                
-                texto_topo = " ".join([str(c) for row in tabela[:2] for c in row if c is not None]).lower()
-                
-                if "aspectos gerais" in texto_topo:
-                    continue
-                
-                for row in tabela:
-                    dados_linha, grupo_novo = identificar_e_mapear_linha(row, grupo_risco_atual)
-                    
-                    if dados_linha is not None:
-                        grupo_risco_atual = grupo_novo
-                        lista_plana_final.append(dados_linha)
-
-    arquivo_saida = "extracao_finalizada1.json"
-    with open(arquivo_saida, "w", encoding="utf-8") as f:
-        json.dump(lista_plana_final, f, ensure_ascii=False, indent=4)
+            # faz o insert na tabela hrn - situacao atual - caso n tenha a chave de 'medida proposta'
+            cursor.execute("""
+                INSERT INTO hrn_sit_atual (
+                    tipo_grupo, perigo, risco_consequencia, p, f, gpl, np, 
+                    avaliacao_valor, avaliacao_status, medida_controle, foto
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                linha.get("Tipo_Grupo") or linha.get("tipo_grupo", ""),
+                linha.get("Perigo") or linha.get("perigo", ""),
+                linha.get("Risco_Consequencia") or linha.get("risco_consequencia", ""),
+                linha.get("P") or linha.get("p", ""),
+                linha.get("F") or linha.get("f", ""),
+                linha.get("GPL") or linha.get("gpl", ""),
+                linha.get("NP") or linha.get("np", ""),
+                linha.get("Avaliacao_Valor") or linha.get("avaliacao_valor", ""),
+                linha.get("Avaliacao_Status") or linha.get("avaliacao_status", ""),
+                linha.get("Medida_Controle") or linha.get("medida_controle", ""),
+                linha.get("Foto") or linha.get("foto", "")
+            ))
+            contador_atual += 1
         
-    print(f"\nFIM! {len(lista_plana_final)} riscos puros e dinâmicos extraídos e salvos em '{arquivo_saida}'.")
+    conn.commit()
+    conn.close()
+    print(f"Sucesso!")
+    print(f"   ↳ {contador_proposta} linhas salvas em 'hrn_sit_proposta'")
+    print(f"   ↳ {contador_atual} linhas salvas em 'hrn_sit_atual'")
 
 if __name__ == "__main__":
-    extrair_somente_riscos_plano("teste3.pdf")
+    # Dica: Exclua o arquivo 'database.db' antigo da pasta antes de rodar para recriar as tabelas limpas
+    criar_banco_e_tabela()
+    importar_json_para_banco()
