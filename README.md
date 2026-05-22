@@ -8,3 +8,5 @@
 **re (expressões regulares):** https://docs.python.org/3/library/re.html
 
 **Sqlite:** https://sqlite.org/docs.html
+
+**Os:** https://docs.python.org/3/library/os.html
