@@ -3,7 +3,7 @@ import json
 import os
 
 # constantes 
-ARQUIVO_JSON = "extracao_finalizada1.json"
+ARQUIVO_JSON = "extracao_finalizada2.json"
 NOME_BANCO = "database.db"
 
 def criar_banco_e_tabela():
@@ -26,7 +26,8 @@ def criar_banco_e_tabela():
         avaliacao_valor TEXT,
         avaliacao_status TEXT,
         medida_controle TEXT,
-        foto TEXT
+        foto TEXT,
+        script BOOLEAN
     )
     """)
     
@@ -44,7 +45,8 @@ def criar_banco_e_tabela():
         avaliacao_valor TEXT,
         avaliacao_status TEXT,
         medida_controle TEXT,
-        foto TEXT
+        foto TEXT,
+        script BOOlEAN
     )
     """)
     
@@ -71,7 +73,7 @@ def importar_json_para_banco():
         if not isinstance(linha, dict):
             continue
 
-        # Tratando variação de maiúscula/minúscula na chave do JSON
+        #tratando variação de maiúscula/minúscula na chave do JSON
         chave_proposta = None
         for k in linha.keys():
             if k.lower() == 'medida_controle_proposta':
@@ -84,8 +86,8 @@ def importar_json_para_banco():
             cursor.execute("""
                 INSERT INTO hrn_sit_proposta (
                     tipo_grupo, perigo, risco_consequencia, medida_Controle_Proposta, p, f, gpl, np, 
-                    avaliacao_valor, avaliacao_status, medida_controle, foto
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    avaliacao_valor, avaliacao_status, medida_controle, foto, script
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)
             """, (
                 linha.get("Tipo_Grupo") or linha.get("tipo_grupo", ""),
                 linha.get("Perigo") or linha.get("perigo", ""),
@@ -102,12 +104,12 @@ def importar_json_para_banco():
             ))
             contador_proposta += 1
         else:
-            # faz o insert na tabela hrn - situacao atual - caso n tenha a chave de 'medida proposta'
+            #faz o insert na tabela hrn - situacao atual - caso n tenha a chave de 'medida proposta'
             cursor.execute("""
                 INSERT INTO hrn_sit_atual (
                     tipo_grupo, perigo, risco_consequencia, p, f, gpl, np, 
-                    avaliacao_valor, avaliacao_status, medida_controle, foto
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    avaliacao_valor, avaliacao_status, medida_controle, foto, script
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)
             """, (
                 linha.get("Tipo_Grupo") or linha.get("tipo_grupo", ""),
                 linha.get("Perigo") or linha.get("perigo", ""),
