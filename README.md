@@ -10,3 +10,9 @@
 **Sqlite:** https://sqlite.org/docs.html
 
 **Os:** https://docs.python.org/3/library/os.html
+
+
+A estrutura dos arquivos é: 
+
+->pasta de pdfs 
+->data_base
