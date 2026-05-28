@@ -11,8 +11,10 @@
 
 **Os:** https://docs.python.org/3/library/os.html
 
+**Fitz (pymupdf):** extração de imagens 
 
 A estrutura dos arquivos é: 
 
 ->pasta de pdfs 
 ->data_base
+->imagens (para as imagens que foram extraidas)
