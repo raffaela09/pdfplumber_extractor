@@ -36,6 +36,5 @@ def extrair_imagens_do_pdf(caminho_pdf):
 
 # --- Como usar ---
 # Substitua 'meu_arquivo.pdf' pelo caminho real do seu PDF
-caminho_do_seu_pdf = "teste1.pdf" 
+caminho_do_seu_pdf = "./pdfs/teste1.pdf" 
 extrair_imagens_do_pdf(caminho_do_seu_pdf)
-
