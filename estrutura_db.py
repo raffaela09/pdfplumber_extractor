@@ -2,23 +2,127 @@ import sqlite3
 import json
 import os
 from pathlib import Path
+from datetime import datetime
+
+ID_EXECUSAO = datetime.now().strftime("%Y%m%d_%H%M%S")
 
 # Constantes
-PASTA_JSONS = "./pdfs/resultados_json"
-PASTA_JSON_CAB = "./pdfs/resultados_json_cabecalhos"
+PASTA_JSONS = "./output/json"
+PASTA_JSON_CAB = "./output/json_cabecalho"
 NOME_BANCO = "./hst_database.sqlite.txt"
+
+def processar_header_para_banco(caminho_pasta):
+
+    pasta_origem = Path(caminho_pasta)
+    arquivos_json = list(pasta_origem.glob("*.json"))
+
+    if not arquivos_json:
+        print(f"Erro: Nenhum arquivo JSON encontrado na pasta '{pasta_origem}'.")
+        return
+
+    conn = sqlite3.connect(NOME_BANCO)
+    conn.execute("PRAGMA foreign_keys = ON")
+    cursor = conn.cursor()
+
+    contador = 0
+
+    print(f"Iniciando a importação de {len(arquivos_json)} arquivos...\n")
+
+    for arquivo in arquivos_json:
+
+        with open(arquivo, 'r', encoding='utf-8') as f:
+            relatorios = json.load(f)
+
+        for linha in relatorios:
+
+            if not isinstance(linha, dict):
+                continue
+
+            v_revisao = linha.get("Revisão") or linha.get("revisao", "")
+            v_tecnico_responsavel = linha.get("Técnico Responsável") or linha.get("tecnico_responsavel", "")
+            v_operacao = linha.get("Operação (área)") or linha.get("operacao", "")
+            v_manutencao = linha.get("Manutenção (área)") or linha.get("manutencao", "")
+            v_seguranca = linha.get("Segurança (área)") or linha.get("seguranca", "")
+            v_demais_participantes = linha.get("Demais Participantes") or linha.get("demais_participantes", "")
+            v_area = linha.get("Área") or linha.get("area", "")
+            v_ilha = linha.get("Ilha") or linha.get("ilha", "")
+            v_registro = linha.get("Registro (Tag)") or linha.get("registro", "")
+            v_denominacao = linha.get("Denominação") or linha.get("denominacao", "")
+            v_tipo = linha.get("Tipo") or linha.get("tipo", "")
+            v_capacidade = linha.get("Capacidade") or linha.get("capacidade", "")
+            v_desenho = linha.get("Desenho de Referência") or linha.get("desenho_de_referencia", "")
+            v_fabricante = linha.get("Fabricante") or linha.get("fabricante", "")
+            v_modelo = linha.get("Modelo") or linha.get("modelo", "")
+            v_numero_serie = linha.get("Numero de Série") or linha.get("numero_de_serie", "")
+            v_ano = linha.get("Ano de Fabricação") or linha.get("ano_de_fabricacao", "")
+            v_obs = linha.get("Observações Gerais") or linha.get("observacoes_gerais", "")
+
+            cursor.execute("""
+                INSERT INTO cab_hrn (
+                    revisao,
+                    
+                    tecnico_responsavel,
+                    operacao,
+                    manutencao,
+                    seguranca,
+                    demais_participantes,
+                    area,
+                    ilha,
+                    registro,
+                    denominacao,
+                    tipo,
+                    capacidade,
+                    desenho_referencia,
+                    fabricante,
+                    modelo,
+                    numero_serie,
+                    ano_fabricacao,
+                    observacoes_gerais,
+                    script
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)
+            """, (
+                v_revisao,
+                v_tecnico_responsavel,
+                v_operacao,
+                v_manutencao,
+                v_seguranca,
+                v_demais_participantes,
+                v_area,
+                v_ilha,
+                v_registro,
+                v_denominacao,
+                v_tipo,
+                v_capacidade,
+                v_desenho,
+                v_fabricante,
+                v_modelo,
+                v_numero_serie,
+                v_ano,
+                v_obs
+            ))
+            
+            contador += 1
+
+        print(f"✅ Arquivo processado: {arquivo.name}")
+
+    conn.commit()
+    conn.close()
+
+    print(f"\n🎉 {contador} cabeçalhos importados!")
 
 
 def criar_banco_e_tabela():
     """Conecta ao banco SQLite e cria as tabelas necessárias."""
 
     conn = sqlite3.connect(NOME_BANCO)
+    conn.execute("PRAGMA foreign_keys = ON")
     cursor = conn.cursor()
 
     # Criando a tabela para situação proposta
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS hrn_sit_proposta (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id_cab INTEGER NOT NULL,
             tipo_grupo TEXT,
             perigo TEXT,
             risco_consequencia TEXT,
@@ -31,7 +135,9 @@ def criar_banco_e_tabela():
             avaliacao_status TEXT,
             medida_controle TEXT,
             foto TEXT,
-            script BOOLEAN
+            script BOOLEAN,
+            
+            FOREIGN KEY (id_cab) REFERENCES cab_hrn (id)
         )
     """)
 
@@ -39,6 +145,7 @@ def criar_banco_e_tabela():
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS hrn_sit_atual (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id_cab INTEGER NOT NULL,
             tipo_grupo TEXT,
             perigo TEXT,
             risco_consequencia TEXT,
@@ -50,7 +157,9 @@ def criar_banco_e_tabela():
             avaliacao_status TEXT,
             medida_controle TEXT,
             foto TEXT,
-            script BOOLEAN
+            script BOOLEAN,
+            
+            FOREIGN KEY (id_cab) REFERENCES cab_hrn (id)
         )
     """)
     cursor.execute("""
@@ -75,11 +184,12 @@ def criar_banco_e_tabela():
             ano_fabricacao TEXT,
             observacoes_gerais TEXT,
             script BOOLEAN
+            
         )
     """)
 
     conn.commit()
-    conn.close()
+    conn.close()    
 
 
 def processar_pasta_para_banco(caminho_pasta):
@@ -93,11 +203,12 @@ def processar_pasta_para_banco(caminho_pasta):
         return
 
     conn = sqlite3.connect(NOME_BANCO)
+    conn.execute("PRAGMA foreign_keys = ON")
     cursor = conn.cursor()
 
     contador_proposta = 0
     contador_atual = 0
-    contador_duplicados = 0  # <-- Novo contador para sabermos quantos foram ignorados
+    contador_duplicados = 0  
 
     print(f"Iniciando a importação de {len(arquivos_json)} arquivos para o banco de dados...\n")
 
@@ -146,12 +257,13 @@ def processar_pasta_para_banco(caminho_pasta):
                       AND risco_consequencia = ?
                       AND medida_Controle_Proposta = ?
                 """, (v_perigo, v_risco, v_medida_prop))
-
+                id_cab = cursor.lastrowid
                 # Se não existir, insere
                 if cursor.fetchone() is None:
 
                     cursor.execute("""
                         INSERT INTO hrn_sit_proposta (
+                            id_cab,
                             tipo_grupo,
                             perigo,
                             risco_consequencia,
@@ -165,8 +277,9 @@ def processar_pasta_para_banco(caminho_pasta):
                             medida_controle,
                             foto,
                             script
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)
+                        ) VALUES (?,?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)
                     """, (
+                        id_cab,
                         v_tipo,
                         v_perigo,
                         v_risco,
@@ -203,6 +316,7 @@ def processar_pasta_para_banco(caminho_pasta):
 
                     cursor.execute("""
                         INSERT INTO hrn_sit_atual (
+                            id_cab,
                             tipo_grupo,
                             perigo,
                             risco_consequencia,
@@ -215,8 +329,9 @@ def processar_pasta_para_banco(caminho_pasta):
                             medida_controle,
                             foto,
                             script
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)
+                        ) VALUES (?,?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)
                     """, (
+                        id_cab,
                         v_tipo,
                         v_perigo,
                         v_risco,
@@ -244,107 +359,7 @@ def processar_pasta_para_banco(caminho_pasta):
     print(f" ↳ {contador_proposta} novas linhas salvas em 'hrn_sit_proposta'")
     print(f" ↳ {contador_atual} novas linhas salvas em 'hrn_sit_atual'")
     print(f" ↳ ⚠️ {contador_duplicados} linhas ignoradas (já existiam no banco)")
-
-
-def processar_header_para_banco(caminho_pasta):
-
-    pasta_origem = Path(caminho_pasta)
-    arquivos_json = list(pasta_origem.glob("*.json"))
-
-    if not arquivos_json:
-        print(f"Erro: Nenhum arquivo JSON encontrado na pasta '{pasta_origem}'.")
-        return
-
-    conn = sqlite3.connect(NOME_BANCO)
-    cursor = conn.cursor()
-
-    contador = 0
-
-    print(f"Iniciando a importação de {len(arquivos_json)} arquivos...\n")
-
-    for arquivo in arquivos_json:
-
-        with open(arquivo, 'r', encoding='utf-8') as f:
-            relatorios = json.load(f)
-
-        for linha in relatorios:
-
-            if not isinstance(linha, dict):
-                continue
-
-            v_revisao = linha.get("Revisão") or linha.get("revisao", "")
-            v_tecnico_responsavel = linha.get("Técnico Responsável") or linha.get("tecnico_responsavel", "")
-            v_operacao = linha.get("Operação (área)") or linha.get("operacao", "")
-            v_manutencao = linha.get("Manutenção (área)") or linha.get("manutencao", "")
-            v_seguranca = linha.get("Segurança (área)") or linha.get("seguranca", "")
-            v_demais_participantes = linha.get("Demais Participantes") or linha.get("demais_participantes", "")
-            v_area = linha.get("Área") or linha.get("area", "")
-            v_ilha = linha.get("Ilha") or linha.get("ilha", "")
-            v_registro = linha.get("Registro (Tag)") or linha.get("registro", "")
-            v_denominacao = linha.get("Denominação") or linha.get("denominacao", "")
-            v_tipo = linha.get("Tipo") or linha.get("tipo", "")
-            v_capacidade = linha.get("Capacidade") or linha.get("capacidade", "")
-            v_desenho = linha.get("Desenho de Referência") or linha.get("desenho_de_referencia", "")
-            v_fabricante = linha.get("Fabricante") or linha.get("fabricante", "")
-            v_modelo = linha.get("Modelo") or linha.get("modelo", "")
-            v_numero_serie = linha.get("Numero de Série") or linha.get("numero_de_serie", "")
-            v_ano = linha.get("Ano de Fabricação") or linha.get("ano_de_fabricacao", "")
-            v_obs = linha.get("Observações Gerais") or linha.get("observacoes_gerais", "")
-
-            cursor.execute("""
-                INSERT INTO cab_hrn (
-                    revisao,
-                    tecnico_responsavel,
-                    operacao,
-                    manutencao,
-                    seguranca,
-                    demais_participantes,
-                    area,
-                    ilha,
-                    registro,
-                    denominacao,
-                    tipo,
-                    capacidade,
-                    desenho_referencia,
-                    fabricante,
-                    modelo,
-                    numero_serie,
-                    ano_fabricacao,
-                    observacoes_gerais,
-                    script
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)
-            """, (
-                v_revisao,
-                v_tecnico_responsavel,
-                v_operacao,
-                v_manutencao,
-                v_seguranca,
-                v_demais_participantes,
-                v_area,
-                v_ilha,
-                v_registro,
-                v_denominacao,
-                v_tipo,
-                v_capacidade,
-                v_desenho,
-                v_fabricante,
-                v_modelo,
-                v_numero_serie,
-                v_ano,
-                v_obs
-            ))
-
-            contador += 1
-
-        print(f"✅ Arquivo processado: {arquivo.name}")
-
-    conn.commit()
-    conn.close()
-
-    print(f"\n🎉 {contador} cabeçalhos importados!")
-
-
-            
+         
 if __name__ == "__main__":
 
     criar_banco_e_tabela()
@@ -352,3 +367,4 @@ if __name__ == "__main__":
     # Processa os JSONs
     processar_pasta_para_banco(PASTA_JSONS)
     processar_header_para_banco(PASTA_JSON_CAB)
+    
