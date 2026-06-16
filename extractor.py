@@ -1,7 +1,7 @@
 import pdfplumber
 import json
 import re
-from pathlib import Path # <-- Nova importação para lidar com pastas e arquivos
+from pathlib import Path 
 
 def identificar_e_mapear_linha(row_cells, grupo_anterior):
     cells = [str(c).strip().replace('\n', ' ') if c is not None else "" for c in row_cells]
@@ -155,12 +155,12 @@ def extrair_somente_riscos_plano(caminho_pdf):
     return lista_plana_final
 
 
-def processar_pasta_de_pdfs(caminho_pasta):
+def process_pdf_folder(caminho_pasta):
     # Transforma a string em um objeto de caminho do Pathlib
     pasta_origem = Path(caminho_pasta)
-    
+    pasta_out = Path('./output')
     # Cria uma subpasta para não misturar os JSONs com os PDFs
-    pasta_destino = pasta_origem / "resultados_json"
+    pasta_destino = pasta_out / "json"
     pasta_destino.mkdir(exist_ok=True)
 
     # Busca todos os arquivos com extensão .pdf na pasta
@@ -170,7 +170,7 @@ def processar_pasta_de_pdfs(caminho_pasta):
         print(f"Nenhum arquivo PDF encontrado na pasta: '{pasta_origem}'.")
         return
 
-    print(f"🚀 Iniciando o processamento em lote. Encontrados {len(arquivos_pdf)} PDFs.")
+    print(f"Iniciando o processamento em lote. Encontrados {len(arquivos_pdf)} PDFs.")
 
     for caminho_pdf in arquivos_pdf:
         print(f"\nExtraindo dados de: {caminho_pdf.name}...")
@@ -186,12 +186,12 @@ def processar_pasta_de_pdfs(caminho_pasta):
         with open(caminho_saida, "w", encoding="utf-8") as f:
             json.dump(dados_extraidos, f, ensure_ascii=False, indent=4)
             
-        print(f"✅ Salvo: {len(dados_extraidos)} riscos extraídos para '{caminho_saida.name}'.")
+        print(f"Salvo: {len(dados_extraidos)} riscos extraídos para '{caminho_saida.name}'.")
         
-    print(f"\n🎉 FIM! Todos os arquivos foram salvos na pasta: {pasta_destino}")
+    print(f"\nFIM! Todos os arquivos foram salvos na pasta: {pasta_destino}")
 
 
-def extrair_cabecalho_blindado(caminho_pdf):
+def extract_header(caminho_pdf):
 
     dados_cabecalho = {}
 
@@ -336,14 +336,15 @@ def extrair_cabecalho_blindado(caminho_pdf):
 # ==================================================
 # PROCESSAMENTO EM LOTE
 # ==================================================
-def processar_pasta_de_pdfs_cab(caminho_pasta):
+def process_pdf_folder_cab(caminho_pasta):
 
     # Converte em objeto Path
     pasta_origem = Path(caminho_pasta)
+    pasta_out = Path("./output")
 
     # Pasta destino
     pasta_destino = (
-        pasta_origem / "resultados_json_cabecalhos"
+        pasta_out / "json_cabecalho"
     )
 
     pasta_destino.mkdir(exist_ok=True)
@@ -356,7 +357,7 @@ def processar_pasta_de_pdfs_cab(caminho_pasta):
     if not arquivos_pdf:
 
         print(
-            f"⚠️ Nenhum arquivo PDF encontrado na pasta: '{pasta_origem}'."
+            f"Nenhum arquivo PDF encontrado na pasta: '{pasta_origem}'."
         )
 
         return
@@ -378,7 +379,7 @@ def processar_pasta_de_pdfs_cab(caminho_pasta):
 
         # Extrai cabeçalho
         cabecalho_extraido = (
-            extrair_cabecalho_blindado(caminho_pdf)
+            extract_header(caminho_pdf)
         )
 
         if cabecalho_extraido:
@@ -412,7 +413,7 @@ def processar_pasta_de_pdfs_cab(caminho_pasta):
                 )
 
             print(
-                f"✅ Salvo: "
+                f"Salvo: "
                 f"'{caminho_saida.name}'."
             )
 
@@ -426,19 +427,14 @@ def processar_pasta_de_pdfs_cab(caminho_pasta):
             )
 
     print(
-        f"\n🎉 FIM! "
+        f"\nFIM! "
         f"Todos os cabeçalhos foram salvos em:\n"
         f"{pasta_destino}"
     )
 
 
-# ==================================================
-# EXECUÇÃO PRINCIPAL
-# ==================================================
-
 if __name__ == "__main__":
-    # Insira o caminho para a pasta onde estão os seus PDFs
-    # Se o script estiver na mesma pasta dos PDFs, você pode usar "."
-    pasta_dos_arquivos = "./pdfs"
-    processar_pasta_de_pdfs(pasta_dos_arquivos)
-    processar_pasta_de_pdfs_cab(pasta_dos_arquivos)
+    pasta_dos_arquivos_cab = "./pdfs"
+    process_pdf_folder(pasta_dos_arquivos_cab)
+    process_pdf_folder_cab(pasta_dos_arquivos_cab)
+

@@ -2,7 +2,7 @@ import pdfplumber
 import json
 
 
-def extrair_cabecalho_blindado(caminho_pdf):
+def extrair_cabecalho(caminho_pdf):
 
     print("Extraindo Cabeçalho com Escudo Anti-Legenda...")
 
@@ -61,7 +61,7 @@ def extrair_cabecalho_blindado(caminho_pdf):
                     or "tipo ou grupo" in texto_linha
                 ):
 
-                    print("🛑 Escudo ativado: Matriz/Legenda ignoradas com sucesso!")
+                    print("Escudo ativado: Matriz/Legenda ignoradas com sucesso!")
 
                     # Interrompe leitura da tabela
                     break
@@ -152,7 +152,7 @@ if __name__ == "__main__":
 
     meu_pdf = "./pdfs/teste.pdf"
 
-    cabecalho_extraido = extrair_cabecalho_blindado(meu_pdf)
+    cabecalho_extraido = extrair_cabecalho(meu_pdf)
 
     dados_para_salvar = (
         [cabecalho_extraido]
