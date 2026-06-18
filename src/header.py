@@ -61,7 +61,7 @@ def extrair_cabecalho(caminho_pdf):
                     or "tipo ou grupo" in texto_linha
                 ):
 
-                    print("🛑 Escudo ativado: Matriz/Legenda ignoradas com sucesso!")
+                    print("Escudo ativado: Matriz/Legenda ignoradas com sucesso!")
 
                     # Interrompe leitura da tabela
                     break
