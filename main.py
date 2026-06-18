@@ -1,30 +1,31 @@
-import os
 from src.extractor import process_pdf_folder, process_pdf_folder_cab
-from src.estrutura_db import create_table, processar_pasta_para_banco, header_to_db
+from src.estrutura_db import (
+    criar_banco_e_tabela,
+    processar_pasta_para_banco,
+    processar_header_para_banco,
+    processar_pasta_de_imagens_para_banco,
+)
 
-PASTA_JSONS = "./output/json"
-NOME_BANCO = "./database/avaliacoes.db"
-PASTA_JSON_CAB = "./output/json_cabecalho"
+PASTA_PDFS = "./pdfs"
+PASTA_JSONS = "./pdfs/resultados_json"
+PASTA_JSON_CAB = "./pdfs/resultados_json_cabecalhos"
+
 
 def main():
-    pasta_dos_arquivos = "./pdfs"
-    process_pdf_folder(pasta_dos_arquivos)
-    pasta_dos_arquivos_cab = "./pdfs"
-    process_pdf_folder(pasta_dos_arquivos_cab)
-    create_table()
-    header_to_db(PASTA_JSON_CAB)
+    # 1. Extrai as tabelas de risco e os cabeçalhos de cada PDF para JSON
+    process_pdf_folder(PASTA_PDFS)
+    process_pdf_folder_cab(PASTA_PDFS)
+
+    # 2. Garante que as tabelas do banco existem (incluindo a tabela 'imagens')
+    criar_banco_e_tabela()
+
+    # 3. Importa os JSONs (riscos e cabeçalhos) para o banco de dados
     processar_pasta_para_banco(PASTA_JSONS)
-    process_pdf_folder_cab(pasta_dos_arquivos_cab)
-    # pasta_saida = './output/picture'
-    
-    # extrair_imagens_por_linha('./pdfs/teste.pdf', pasta_saida)
+    processar_header_para_banco(PASTA_JSON_CAB)
+
+    # 4. Extrai as imagens dos PDFs e salva o binário delas no banco
+    processar_pasta_de_imagens_para_banco(PASTA_PDFS)
 
 
-if __name__ == '__main__':  
+if __name__ == '__main__':
     main()
-    
-    
-#verificar pra depois da execucao do codigo, limpar a pasta de jsons
-#alguma forma de ver se teve alteracao na pasta, pra entao executar o codigo
-#questao das imagens
-    
